@@ -40,7 +40,7 @@ Registro de quantidade por tipo de análise:
 | **Pureza** | Pode ter mais de uma amostra |
 | **DOSN** | Determinação de outras sementes nocivas |
 | **Umidade** | Teor de umidade |
-| **DT** | Determinação de tetrazólio |
+| **DT** | Deterioração acelerada |
 
 ### Dados em Tempo Real
 - Sincronização automática entre dispositivos via **Firebase Realtime Database**
