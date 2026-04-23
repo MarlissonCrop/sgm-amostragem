@@ -836,13 +836,18 @@ function dbRef(path){ return window._dbRef(window._db, path); }
 
 async function dbSaveLote(lote){
   _pausarRealtime=true;
+  console.log("dbSaveLote chamada:", lote.id);
   try{
     await window._dbSet(dbRef("lotes/"+lote.id),{
       id:lote.id, especie:lote.especie||"", cultivar:lote.cultivar||"",
       cliente:lote.cliente||"", renasem:lote.renasem||"",
       criado_em: lote.criadoEm ? lote.criadoEm.toISOString() : new Date().toISOString()
     });
-  }catch(e){ syncMsg("⚠ Erro ao salvar lote",true); }
+    console.log("dbSaveLote OK:", lote.id);
+  }catch(e){
+    console.error("dbSaveLote ERRO:", e);
+    syncMsg("⚠ Erro ao salvar lote",true);
+  }
   finally{
     salvarLocal();
     _ultimoTimestamp=Date.now();
@@ -863,6 +868,7 @@ async function dbDeleteLote(lid){
 
 async function dbSaveBag(lid,bag){
   _pausarRealtime=true;
+  console.log("dbSaveBag chamada:", lid, "bag:", bag.num);
   try{
     await window._dbSet(dbRef("bags/"+lid+"/bag_"+bag.num),{
       num:bag.num, responsavel:bag.responsavel||null,
@@ -870,9 +876,11 @@ async function dbSaveBag(lid,bag){
       hora:bag.hora ? bag.hora.toISOString() : new Date().toISOString(),
       amostras:bag.amostras||{}
     });
+    console.log("dbSaveBag OK:", lid, bag.num);
     salvarLocal();
     syncMsg("☁ Salvo");
   }catch(e){
+    console.error("dbSaveBag ERRO:", e);
     salvarLocal();
     syncMsg("📴 Salvo localmente",true);
   }
@@ -1181,8 +1189,10 @@ async function registrarOCR(){
   lotes[lid].bags.push(bag);
   closeAll(); render(); stats();
   toast("✓ Bag "+bn+" registrada — "+lid);
+  console.log("Chamando dbSaveLote e dbSaveBag para:", lid, bn);
   await dbSaveLote(lotes[lid]);
   await dbSaveBag(lid,bag);
+  console.log("Save completo para:", lid, bn);
 }
 
 // ── QUICK ADD ─────────────────────────────────────────────
