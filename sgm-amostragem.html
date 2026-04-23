@@ -845,15 +845,19 @@ async function dbSaveLote(lote){
   }catch(e){ syncMsg("⚠ Erro ao salvar lote",true); }
   finally{
     salvarLocal();
-    setTimeout(()=>{ _pausarRealtime=false; },1500);
+    _ultimoTimestamp=Date.now();
+    setTimeout(()=>{ _pausarRealtime=false; },2000);
   }
 }
 
 async function dbDeleteLote(lid){
+  _pausarRealtime=true;
   try{
     await window._dbRemove(dbRef("lotes/"+lid));
     await window._dbRemove(dbRef("bags/"+lid));
+    salvarLocal();
   }catch(e){ syncMsg("⚠ Erro ao excluir lote",true); }
+  finally{ setTimeout(()=>{ _pausarRealtime=false; },1500); }
 }
 
 async function dbSaveBag(lid,bag){
@@ -871,13 +875,19 @@ async function dbSaveBag(lid,bag){
     salvarLocal();
     syncMsg("📴 Salvo localmente",true);
   }
-  finally{ setTimeout(()=>{ _pausarRealtime=false; },1500); }
+  finally{
+    _ultimoTimestamp=Date.now();
+    setTimeout(()=>{ _pausarRealtime=false; },2000);
+  }
 }
 
 async function dbDeleteBag(lid,bn){
+  _pausarRealtime=true;
   try{
     await window._dbRemove(dbRef("bags/"+lid+"/bag_"+bn));
+    salvarLocal();
   }catch(e){ syncMsg("⚠ Erro ao excluir bag",true); }
+  finally{ setTimeout(()=>{ _pausarRealtime=false; },1500); }
 }
 
 async function dbUpdateBag(lid,bag){ await dbSaveBag(lid,bag); }
@@ -953,6 +963,7 @@ async function carregarDados(){
       }
     }
     salvarLocal(); // salva cópia local após carregar da nuvem
+    _ultimoTimestamp=Date.now();
     render(); stats();
     ativarRealtime();
   }catch(e){
@@ -971,12 +982,19 @@ async function carregarDados(){
 
 let _realtimeAtivo=false;
 let _pausarRealtime=false;
+let _ultimoTimestamp=0;
 
 function ativarRealtime(){
   if(_realtimeAtivo) return;
   _realtimeAtivo=true;
-  window._dbOnValue(dbRef("/"), ()=>{
-    if(!_pausarRealtime) carregarDados();
+  // Escuta mudanças — só recarrega se não foi alteração local
+  window._dbOnValue(dbRef("lotes"), (snap)=>{
+    if(_pausarRealtime) return;
+    const agora=Date.now();
+    // Debounce: ignora se chamada nos últimos 2s
+    if(agora-_ultimoTimestamp < 2000) return;
+    _ultimoTimestamp=agora;
+    carregarDados();
   });
   syncMsg("🔴 Tempo real ativo");
 }
