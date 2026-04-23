@@ -852,12 +852,13 @@ async function dbSaveLote(lote){
 
 async function dbDeleteLote(lid){
   _pausarRealtime=true;
+  _ultimoTimestamp=Date.now();
   try{
     await window._dbRemove(dbRef("lotes/"+lid));
     await window._dbRemove(dbRef("bags/"+lid));
     salvarLocal();
-  }catch(e){ syncMsg("⚠ Erro ao excluir lote",true); }
-  finally{ setTimeout(()=>{ _pausarRealtime=false; },1500); }
+  }catch(e){ console.warn("dbDeleteLote:", e); }
+  finally{ setTimeout(()=>{ _pausarRealtime=false; },2000); }
 }
 
 async function dbSaveBag(lid,bag){
@@ -883,30 +884,36 @@ async function dbSaveBag(lid,bag){
 
 async function dbDeleteBag(lid,bn){
   _pausarRealtime=true;
+  _ultimoTimestamp=Date.now();
   try{
     await window._dbRemove(dbRef("bags/"+lid+"/bag_"+bn));
     salvarLocal();
-  }catch(e){ syncMsg("⚠ Erro ao excluir bag",true); }
-  finally{ setTimeout(()=>{ _pausarRealtime=false; },1500); }
+  }catch(e){ console.warn("dbDeleteBag:", e); }
+  finally{ setTimeout(()=>{ _pausarRealtime=false; },2000); }
 }
 
 async function dbUpdateBag(lid,bag){ await dbSaveBag(lid,bag); }
 
-// ── OFFLINE / LOCAL STORAGE ──────────────────────────────
+// ── LOCAL STORAGE (fonte primária de dados) ──────────────
 function salvarLocal(){
   try{
     const dados={lotes:{}};
     for(const lid in lotes){
       dados.lotes[lid]={
-        ...lotes[lid],
+        id:lotes[lid].id, especie:lotes[lid].especie,
+        cultivar:lotes[lid].cultivar, cliente:lotes[lid].cliente,
+        renasem:lotes[lid].renasem,
         criadoEm: lotes[lid].criadoEm ? lotes[lid].criadoEm.toISOString() : new Date().toISOString(),
         bags: lotes[lid].bags.map(b=>({
-          ...b, hora: b.hora ? b.hora.toISOString() : new Date().toISOString()
+          num:b.num, responsavel:b.responsavel||null,
+          amostragem:b.amostragem||false, homored:b.homored||false,
+          amostras:b.amostras||{Pureza:0,DOSN:0,Umidade:0,DT:0},
+          hora: b.hora ? b.hora.toISOString() : new Date().toISOString()
         }))
       };
     }
     localStorage.setItem("sgm_dados", JSON.stringify(dados));
-  }catch(e){}
+  }catch(e){ console.warn("salvarLocal erro:", e); }
 }
 
 function carregarLocal(){
@@ -920,10 +927,12 @@ function carregarLocal(){
       lotes[lid]={
         id:l.id, especie:l.especie, cultivar:l.cultivar,
         cliente:l.cliente, renasem:l.renasem,
-        criadoEm: new Date(l.criado_em||l.criadoEm),
-        bags: (l.bags||[]).map(b=>({
-          ...b, hora: new Date(b.hora),
-          amostras: b.amostras||{Pureza:0,DOSN:0,Umidade:0,DT:0}
+        criadoEm: new Date(l.criadoEm||l.criado_em||Date.now()),
+        bags:(l.bags||[]).map(b=>({
+          num:b.num, responsavel:b.responsavel||null,
+          amostragem:b.amostragem||false, homored:b.homored||false,
+          amostras:Object.assign({Pureza:0,DOSN:0,Umidade:0,DT:0}, b.amostras||{}),
+          hora:new Date(b.hora||Date.now())
         }))
       };
     }
@@ -933,6 +942,12 @@ function carregarLocal(){
 
 async function carregarDados(){
   $("loadingOv").classList.add("show");
+
+  // 1. Carrega local imediatamente (evita tela vazia)
+  const temLocal = carregarLocal();
+  if(temLocal){ render(); stats(); }
+
+  // 2. Tenta sincronizar com Firebase
   try{
     const lotesSnap = await window._dbGet(dbRef("lotes"));
     const bagsSnap  = await window._dbGet(dbRef("bags"));
@@ -942,7 +957,8 @@ async function carregarDados(){
       for(const lid in ld){
         const l=ld[lid];
         lotes[lid]={id:l.id,especie:l.especie,cultivar:l.cultivar,
-          cliente:l.cliente,renasem:l.renasem,bags:[],criadoEm:new Date(l.criado_em)};
+          cliente:l.cliente,renasem:l.renasem,bags:[],
+          criadoEm:new Date(l.criado_em||Date.now())};
       }
     }
     if(bagsSnap.exists()){
@@ -956,22 +972,18 @@ async function carregarDados(){
           lotes[lid].bags.push({
             num:b.num, responsavel:b.responsavel||null,
             amostragem:b.amostragem||false, homored:b.homored||false,
-            amostras:am, hora:new Date(b.hora)
+            amostras:am, hora:new Date(b.hora||Date.now())
           });
         }
         lotes[lid].bags.sort((a,b)=>parseInt(a.num)-parseInt(b.num));
       }
     }
-    salvarLocal(); // salva cópia local após carregar da nuvem
-    _ultimoTimestamp=Date.now();
+    salvarLocal(); // atualiza cache local com dados da nuvem
     render(); stats();
     ativarRealtime();
   }catch(e){
-    // Sem internet — carrega do armazenamento local
-    const temLocal = carregarLocal();
     if(temLocal){
-      syncMsg("📴 Offline — dados locais carregados",true);
-      render(); stats();
+      syncMsg("📴 Offline — usando dados locais",true);
     } else {
       syncMsg("⚠ Sem conexão e sem dados locais",true);
     }
@@ -980,6 +992,8 @@ async function carregarDados(){
   }
 }
 
+// Realtime: polling simples a cada 30s para sincronizar entre dispositivos
+// Evita o onValue que causava loops e perda de dados
 let _realtimeAtivo=false;
 let _pausarRealtime=false;
 let _ultimoTimestamp=0;
@@ -987,16 +1001,29 @@ let _ultimoTimestamp=0;
 function ativarRealtime(){
   if(_realtimeAtivo) return;
   _realtimeAtivo=true;
-  // Escuta mudanças — só recarrega se não foi alteração local
-  window._dbOnValue(dbRef("lotes"), (snap)=>{
+  // Polling a cada 30 segundos para ver se outro dispositivo mudou algo
+  setInterval(async ()=>{
     if(_pausarRealtime) return;
-    const agora=Date.now();
-    // Debounce: ignora se chamada nos últimos 2s
-    if(agora-_ultimoTimestamp < 2000) return;
-    _ultimoTimestamp=agora;
-    carregarDados();
-  });
-  syncMsg("🔴 Tempo real ativo");
+    if(Date.now()-_ultimoTimestamp < 5000) return; // ignora se mudou recentemente
+    try{
+      const snap=await window._dbGet(dbRef("lotes"));
+      if(!snap.exists()) return;
+      const dadosNuvem=snap.val();
+      // Verifica se há lotes na nuvem que não estão local
+      let mudou=false;
+      for(const lid in dadosNuvem){
+        if(!lotes[lid]) { mudou=true; break; }
+      }
+      for(const lid in lotes){
+        if(!dadosNuvem[lid]) { mudou=true; break; }
+      }
+      if(mudou){
+        await carregarDados();
+        syncMsg("🔄 Sincronizado");
+      }
+    }catch(e){}
+  }, 30000);
+  syncMsg("☁ Conectado ao Firebase");
 }
 
 // ── CÂMERA / OCR REAL ────────────────────────────────────
