@@ -987,18 +987,15 @@ $("cameraInput").addEventListener("change",async function(e){
   const file=e.target.files[0]; if(!file) return;
   $("scanOv").classList.add("open");
 
-  // Lê arquivo como base64 via FileReader
   const reader = new FileReader();
   reader.onload = async function(ev){
     try{
-      // Mostra preview
       $("previewImg").src = ev.target.result;
       $("previewImg").style.display = "block";
 
-      // Redimensiona via canvas antes de enviar
-      const base64 = await redimensionarBase64(ev.target.result, 1200, 0.85);
+      // Envia direto para Vision API sem redimensionar
+      const base64 = ev.target.result.split(",")[1];
 
-      // Chama Vision API
       const resp = await fetch(
         "https://vision.googleapis.com/v1/images:annotate?key="+VISION_KEY,
         {
@@ -1014,18 +1011,18 @@ $("cameraInput").addEventListener("change",async function(e){
       );
 
       if(!resp.ok){
-        const err = await resp.text();
-        console.error("Vision API erro:", resp.status, err);
-        throw new Error(resp.status);
+        const errTxt = await resp.text();
+        console.error("Vision API erro:", resp.status, errTxt);
+        throw new Error("Status "+resp.status);
       }
 
       const data = await resp.json();
       const texto = data.responses?.[0]?.fullTextAnnotation?.text || "";
-      console.log("OCR extraído:\n", texto);
+      console.log("OCR extraído:", texto);
       parseEtiqueta(texto);
 
     }catch(err){
-      console.error("OCR falhou:", err);
+      console.error("OCR falhou:", err.message||err);
       limparCamposOCR();
       syncMsg("⚠ OCR falhou — preencha manualmente", true);
     }finally{
@@ -1042,30 +1039,6 @@ $("cameraInput").addEventListener("change",async function(e){
   reader.readAsDataURL(file);
   this.value = "";
 });
-
-// Redimensiona imagem a partir de dataURL usando canvas
-function redimensionarBase64(dataURL, maxSize, quality){
-  return new Promise((resolve)=>{
-    const img = new Image();
-    img.onload = function(){
-      let w = img.width, h = img.height;
-      if(w > maxSize || h > maxSize){
-        if(w > h){ h = Math.round(h * maxSize / w); w = maxSize; }
-        else      { w = Math.round(w * maxSize / h); h = maxSize; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      const resultado = canvas.toDataURL("image/jpeg", quality);
-      resolve(resultado.split(",")[1]);
-    };
-    img.onerror = function(){
-      // Se falhar o redimensionamento, usa o original
-      resolve(dataURL.split(",")[1]);
-    };
-    img.src = dataURL;
-  });
-}
 
 function parseEtiqueta(texto){
   limparCamposOCR();
