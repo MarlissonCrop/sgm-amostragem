@@ -987,72 +987,83 @@ $("cameraInput").addEventListener("change",async function(e){
   const file=e.target.files[0]; if(!file) return;
   $("scanOv").classList.add("open");
 
-  try{
-    // Redimensiona imagem antes de enviar (máx 1024px, qualidade 85%)
-    const base64 = await redimensionarImagem(file, 1024, 0.85);
-    $("previewImg").src="data:image/jpeg;base64,"+base64;
-    $("previewImg").style.display="block";
+  // Lê arquivo como base64 via FileReader
+  const reader = new FileReader();
+  reader.onload = async function(ev){
+    try{
+      // Mostra preview
+      $("previewImg").src = ev.target.result;
+      $("previewImg").style.display = "block";
 
-    const resp=await fetch(
-      "https://vision.googleapis.com/v1/images:annotate?key="+VISION_KEY,
-      {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          requests:[{
-            image:{content:base64},
-            features:[{type:"TEXT_DETECTION",maxResults:1}]
-          }]
-        })
+      // Redimensiona via canvas antes de enviar
+      const base64 = await redimensionarBase64(ev.target.result, 1200, 0.85);
+
+      // Chama Vision API
+      const resp = await fetch(
+        "https://vision.googleapis.com/v1/images:annotate?key="+VISION_KEY,
+        {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({
+            requests:[{
+              image:{content: base64},
+              features:[{type:"TEXT_DETECTION", maxResults:1}]
+            }]
+          })
+        }
+      );
+
+      if(!resp.ok){
+        const err = await resp.text();
+        console.error("Vision API erro:", resp.status, err);
+        throw new Error(resp.status);
       }
-    );
 
-    if(!resp.ok){
-      const errData=await resp.json();
-      console.error("Vision API erro:",resp.status, errData);
-      throw new Error("Vision API: "+resp.status);
+      const data = await resp.json();
+      const texto = data.responses?.[0]?.fullTextAnnotation?.text || "";
+      console.log("OCR extraído:\n", texto);
+      parseEtiqueta(texto);
+
+    }catch(err){
+      console.error("OCR falhou:", err);
+      limparCamposOCR();
+      syncMsg("⚠ OCR falhou — preencha manualmente", true);
+    }finally{
+      $("scanOv").classList.remove("open");
+      $("ocrModal").classList.add("open");
+      setTimeout(()=>$("fBagNum").focus(), 200);
     }
-
-    const data=await resp.json();
-    const textoCompleto=data.responses?.[0]?.fullTextAnnotation?.text||"";
-    console.log("OCR texto extraído:",textoCompleto);
-    parseEtiqueta(textoCompleto);
-
-  }catch(err){
-    console.error("OCR erro:",err);
-    limparCamposOCR();
-    syncMsg("⚠ OCR falhou — preencha manualmente",true);
-  }finally{
+  };
+  reader.onerror = function(){
     $("scanOv").classList.remove("open");
+    limparCamposOCR();
     $("ocrModal").classList.add("open");
-    setTimeout(()=>$("fBagNum").focus(),200);
-  }
-  this.value="";
+  };
+  reader.readAsDataURL(file);
+  this.value = "";
 });
 
-// Redimensiona imagem para reduzir tamanho antes de enviar à Vision API
-function redimensionarImagem(file, maxSize, quality){
-  return new Promise((resolve, reject)=>{
-    const img=new Image();
-    const url=URL.createObjectURL(file);
-    img.onload=function(){
-      URL.revokeObjectURL(url);
-      let w=img.width, h=img.height;
-      // Mantém proporção
-      if(w>maxSize||h>maxSize){
-        if(w>h){ h=Math.round(h*maxSize/w); w=maxSize; }
-        else    { w=Math.round(w*maxSize/h); h=maxSize; }
+// Redimensiona imagem a partir de dataURL usando canvas
+function redimensionarBase64(dataURL, maxSize, quality){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = function(){
+      let w = img.width, h = img.height;
+      if(w > maxSize || h > maxSize){
+        if(w > h){ h = Math.round(h * maxSize / w); w = maxSize; }
+        else      { w = Math.round(w * maxSize / h); h = maxSize; }
       }
-      const canvas=document.createElement("canvas");
-      canvas.width=w; canvas.height=h;
-      const ctx=canvas.getContext("2d");
-      ctx.drawImage(img,0,0,w,h);
-      // Retorna apenas o base64 sem o prefixo data:...
-      const dataUrl=canvas.toDataURL("image/jpeg", quality);
-      resolve(dataUrl.split(",")[1]);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const resultado = canvas.toDataURL("image/jpeg", quality);
+      resolve(resultado.split(",")[1]);
     };
-    img.onerror=reject;
-    img.src=url;
+    img.onerror = function(){
+      // Se falhar o redimensionamento, usa o original
+      resolve(dataURL.split(",")[1]);
+    };
+    img.src = dataURL;
   });
 }
 
