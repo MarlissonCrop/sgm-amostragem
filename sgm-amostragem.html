@@ -834,11 +834,16 @@ let di=0;
 // ── FIREBASE DB ───────────────────────────────────────────
 function dbRef(path){ return window._dbRef(window._db, path); }
 
+// Firebase não aceita . # $ [ ] nas chaves — substitui por _
+function sanitizeKey(key){
+  return String(key).replace(/[.#$\[\]]/g, "_");
+}
+
 async function dbSaveLote(lote){
   _pausarRealtime=true;
   console.log("dbSaveLote chamada:", lote.id);
   try{
-    await window._dbSet(dbRef("lotes/"+lote.id),{
+    await window._dbSet(dbRef("lotes/"+sanitizeKey(lote.id)),{
       id:lote.id, especie:lote.especie||"", cultivar:lote.cultivar||"",
       cliente:lote.cliente||"", renasem:lote.renasem||"",
       criado_em: lote.criadoEm ? lote.criadoEm.toISOString() : new Date().toISOString()
@@ -859,8 +864,8 @@ async function dbDeleteLote(lid){
   _pausarRealtime=true;
   _ultimoTimestamp=Date.now();
   try{
-    await window._dbRemove(dbRef("lotes/"+lid));
-    await window._dbRemove(dbRef("bags/"+lid));
+    await window._dbRemove(dbRef("lotes/"+sanitizeKey(lid)));
+    await window._dbRemove(dbRef("bags/"+sanitizeKey(lid)));
     salvarLocal();
   }catch(e){ console.warn("dbDeleteLote:", e); }
   finally{ setTimeout(()=>{ _pausarRealtime=false; },2000); }
@@ -870,7 +875,7 @@ async function dbSaveBag(lid,bag){
   _pausarRealtime=true;
   console.log("dbSaveBag chamada:", lid, "bag:", bag.num);
   try{
-    await window._dbSet(dbRef("bags/"+lid+"/bag_"+bag.num),{
+    await window._dbSet(dbRef("bags/"+sanitizeKey(lid)+"/bag_"+sanitizeKey(bag.num)),{
       num:bag.num, responsavel:bag.responsavel||null,
       amostragem:bag.amostragem||false, homored:bag.homored||false,
       hora:bag.hora ? bag.hora.toISOString() : new Date().toISOString(),
@@ -894,7 +899,7 @@ async function dbDeleteBag(lid,bn){
   _pausarRealtime=true;
   _ultimoTimestamp=Date.now();
   try{
-    await window._dbRemove(dbRef("bags/"+lid+"/bag_"+bn));
+    await window._dbRemove(dbRef("bags/"+sanitizeKey(lid)+"/bag_"+sanitizeKey(bn)));
     salvarLocal();
   }catch(e){ console.warn("dbDeleteBag:", e); }
   finally{ setTimeout(()=>{ _pausarRealtime=false; },2000); }
