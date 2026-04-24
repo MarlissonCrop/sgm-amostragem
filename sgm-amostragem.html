@@ -1063,6 +1063,64 @@ function ativarRealtime(){
 // ── CÂMERA / OCR REAL ────────────────────────────────────
 const VISION_KEY = "AIzaSyC69NdXrDloVrQV-rD0FcgyhXO8cmvJ3Mk";
 
+// ── PARSE OCR ────────────────────────────────────────────
+function parseEtiqueta(texto){
+  limparCamposOCR();
+  if(!texto) return;
+
+  // ── ID DO LOTE ──
+  const padraoLote=[
+    /Ident(?:\w*\.?\s*Inter(?:na)?\.?)\s*[:\-]\s*([\w\.\-\/]+)/i,
+    /(?:Lote|LOT)[:\s]+([A-Z0-9][\w\.\-\/]{3,})/i,
+    /\b(\d{2,}\.\d{3,}\.[\w\.]{3,})\b/,
+  ];
+  for(const p of padraoLote){
+    const m=texto.match(p);
+    if(m&&m[1].length>=4){$("fLoteId").value=m[1].trim();break;}
+  }
+
+  // ── ESPÉCIE ──
+  const mEsp=texto.match(/Esp[eé]c(?:ie|\.)\s*[:\-]\s*([A-Za-záàãâéêíóôõúç\s]{4,40})/i);
+  if(mEsp){
+    $("fEspecie").value=mEsp[1].split("\n")[0].trim().substring(0,40);
+  } else {
+    const especies=[
+      ["Megathyrsus","Megathyrsus maximus"],
+      ["Brachiaria brizantha","Brachiaria brizantha"],
+      ["Brachiaria decumbens","Brachiaria decumbens"],
+      ["Brachiaria ruziziensis","Brachiaria ruziziensis"],
+      ["Brachiaria humidicola","Brachiaria humidicola"],
+      ["Panicum","Panicum maximum"],
+      ["Andropogon","Andropogon gayanus"],
+      ["SOJA","Soja"],["MILHO","Milho"],["FEIJ","Feijão"],
+      ["TRIGO","Trigo"],["SORGO","Sorgo"],["ARROZ","Arroz"],
+    ];
+    const tu=texto.toUpperCase();
+    for(const [k,v] of especies){if(tu.includes(k.toUpperCase())){$("fEspecie").value=v;break;}}
+  }
+
+  // ── CULTIVAR ──
+  const mCV=texto.match(/Cultivar\s*[:\-]\s*([A-Z0-9][\w\s\.\-]{1,30})/i);
+  if(mCV){$("fCultivar").value=mCV[1].split("\n")[0].trim().substring(0,30);}
+
+  // ── CLIENTE ──
+  const padraoCliente=[
+    /Prod\.?\s*Orig\.?\s*[:\-]\s*([A-Za-záàãâéêíóôõúçÀ-Ú][\w\s\.\,]{3,60})/i,
+    /Produtor\s*[:\-]\s*([A-Za-záàãâéêíóôõúçÀ-Ú][\w\s\.]{3,50})/i,
+    /Cliente\s*[:\-]\s*([A-Za-záàãâéêíóôõúçÀ-Ú][\w\s\.]{3,50})/i,
+    /Fazenda\s*[:\-]\s*([A-Za-záàãâéêíóôõúçÀ-Ú][\w\s\.]{3,50})/i,
+  ];
+  for(const p of padraoCliente){
+    const m=texto.match(p);
+    if(m){$("fCliente").value=m[1].split("\n")[0].trim().substring(0,60);break;}
+  }
+
+  // ── RENASEM ──
+  const mRen=texto.match(/Renasem\s*[:\-]\s*([A-Z]{2}[\-\s]?\d{3,6}\/\d{4})/i)
+    ||texto.match(/([A-Z]{2}-\d{3,6}\/\d{4})/);
+  if(mRen){$("fRenasem").value=mRen[1].trim();}
+}
+
 // Função compartilhada para processar imagem (câmera ou galeria)
 async function processarImagem(file){
   if(!file) return;
