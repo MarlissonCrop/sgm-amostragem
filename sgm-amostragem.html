@@ -845,6 +845,8 @@ let _delAction=null;
 const qaTabs={};
 const TIPOS=["Pureza","DOSN","Umidade","DT"];
 const RESPONSAVEIS=["Marlisson","Guilhermino","Jalmir","Eduardo"];
+const lotesAbertos={};
+let _scrollPos=0;
 const DEMOS=[
   {loteId:"LOT-2024-00451",especie:"Soja", cultivar:"TMG 7062 IPRO",cliente:"Fazenda Boa Vista", renasem:"MT-00891/2024"},
   {loteId:"LOT-2024-00452",especie:"Milho",cultivar:"DKB 390 PRO3", cliente:"Agropecuária Silva",renasem:"GO-00234/2024"},
@@ -1445,11 +1447,17 @@ function renderBag(lid,bag){
 }
 
 function render(){
+  _scrollPos=window.scrollY;
+  document.querySelectorAll(".bags-list").forEach(el=>{
+    const lid=el.id.replace("bags-","");
+    lotesAbertos[lid]=el.classList.contains("open");
+  });
   const c=$("lotesContainer"), ids=Object.keys(lotes);
   if(!ids.length){
     c.innerHTML=`<div class="empty-state"><div class="icon">🌱</div><p>Nenhum lote registrado ainda.<br>Fotografe a etiqueta de uma bag para começar.</p></div>`;
     return;
   }
+  ids.forEach(lid=>{ if(!(lid in lotesAbertos)) lotesAbertos[lid]=true; });
   c.innerHTML=ids.map(lid=>{
     const l=lotes[lid], done=l.bags.filter(b=>b.homored&&TIPOS.some(t=>(b.amostras[t]||0)>0)).length;
     return `<div class="lote-card">
@@ -1485,11 +1493,12 @@ function render(){
           <button class="btn-x" onclick="toggleQA('${lid}')">✕ Cancelar</button>
         </div>
       </div>
-      <div class="bags-list open" id="bags-${lid}">
+      <div class="bags-list ${lotesAbertos[lid]!==false?"open":""}" id="bags-${lid}">
         ${l.bags.map(bag=>renderBag(lid,bag)).join("")}
       </div>
     </div>`;
   }).join("");
+  requestAnimationFrame(()=>{ window.scrollTo({top:_scrollPos,behavior:"instant"}); });
 }
 
 // ── INICIAR ──────────────────────────────────────────────
