@@ -451,7 +451,7 @@ main{max-width:700px;margin:0 auto;padding:10px 12px 100px}
 <script>
 // ── ESTADO ────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const RESPONSAVEIS = ["Marlisson","Guilhermino","Jalmir","Eduardo"];
+const RESPONSAVEIS = ["Marlisson","Jalmir"];
 const TIPOS = ["Pureza","DOSN","Umidade","DT"];
 const VISION_KEY = "AIzaSyC69NdXrDloVrQV-rD0FcgyhXO8cmvJ3Mk";
 
@@ -933,7 +933,6 @@ function gerarEtiquetas(){
             <div class="etiqueta-row"><span class="etiqueta-label">Espécie</span><span class="etiqueta-value" style="font-size:9px">${lote.especie}</span></div>
             <div class="etiqueta-row"><span class="etiqueta-label">Data</span><span class="etiqueta-value">${data}</span></div>
             <div class="etiqueta-row"><span class="etiqueta-label">Peso Inicial</span><span class="etiqueta-value"></span></div>
-            <div class="etiqueta-row etiqueta-obs"><span class="etiqueta-label">Observação</span><span class="etiqueta-value"></span></div>
           </div>
           <div class="etiqueta-col">
             <div class="etiqueta-row"><span class="etiqueta-label">No. Bag</span><span class="etiqueta-value">${bag.num}</span></div>
@@ -941,9 +940,9 @@ function gerarEtiquetas(){
             <div class="etiqueta-row"><span class="etiqueta-label">Hora</span><span class="etiqueta-value">${hora}</span></div>
             <div class="etiqueta-row"><span class="etiqueta-label">Responsável</span><span class="etiqueta-value">${bag.responsavel||"—"}</span></div>
             <div class="etiqueta-row"><span class="etiqueta-label">Peso Final</span><span class="etiqueta-value"></span></div>
-            <div class="etiqueta-row etiqueta-obs"><span class="etiqueta-label">Observação</span><span class="etiqueta-value"></span></div>
           </div>
         </div>
+        <div style="border-top:1px solid #000;padding:3px 5px;min-height:32px;"><div style="font-size:8px;color:#333;font-weight:bold;">Observação</div><div style="font-size:11px;min-height:20px;"></div></div>
       </div>`;
     }
   });
