@@ -1127,7 +1127,15 @@ function render(){
   let filtered;
   if(currentTab==="andamento")filtered=ids.filter(l=>!lotes[l].prioridade&&!isLoteConcluido(lotes[l]));
   else if(currentTab==="prioridade")filtered=ids.filter(l=>lotes[l].prioridade&&!isLoteConcluido(lotes[l]));
-  else filtered=ids.filter(l=>isLoteConcluido(lotes[l]));
+  else {
+    filtered=ids.filter(l=>isLoteConcluido(lotes[l]));
+    // Ordena por data de conclusão — mais recente primeiro
+    filtered.sort((a,b)=>{
+      const dA=lotes[a].concluidoEm?lotes[a].concluidoEm.getTime():0;
+      const dB=lotes[b].concluidoEm?lotes[b].concluidoEm.getTime():0;
+      return dB-dA;
+    });
+  }
 
   if(!ids.length){
     $("lotesContainer").innerHTML='<div class="empty"><div class="icon">🌱</div><p>Nenhum lote registrado ainda.<br>Fotografe a etiqueta para começar.</p></div>';
