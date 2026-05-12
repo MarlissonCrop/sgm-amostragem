@@ -735,7 +735,7 @@ function parseEtiqueta(texto){
   for(const p of pCli){const m=texto.match(p);if(m){$("fCliente").value=m[1].split("\n")[0].trim().substring(0,60);break;}}
   const mRen=texto.match(/Renasem\s*[:\-]\s*([A-Z]{2}[\-\s]?\d{3,6}\/\d{4})/i)||texto.match(/([A-Z]{2}-\d{3,6}\/\d{4})/);
   if(mRen){$("fRenasem").value=mRen[1].trim();}
-  if(/PROD\.?\s*HOMOG|HOMOG\.?\s*\d|BATIDA/i.test(texto)){window._ocrPrioridade=true;}
+  if(/PROD\.?\s*HOMOG|HOMOG\.?\s*\d|BATIDA|\bLF\b/i.test(texto)){window._ocrPrioridade=true;}
   else{window._ocrPrioridade=false;}
 }
 
@@ -788,7 +788,7 @@ async function registrarOCR(){
         cul=$("fCultivar").value.trim(),cli=$("fCliente").value.trim(),
         ren=$("fRenasem").value.trim(),bn=$("fBagNum").value.trim();
   if(!lid||!bn){toast("⚠ Preencha o ID do lote e o nº da bag");return;}
-  const isPrio=window._ocrPrioridade||/HOMOG|BATIDA/i.test(lid+esp+cul);
+  const isPrio=window._ocrPrioridade||/HOMOG|BATIDA|LF/i.test(lid+esp+cul);
   if(!lotes[lid])lotes[lid]={id:lid,especie:esp,cultivar:cul,cliente:cli,renasem:ren,bags:[],prioridade:isPrio,criadoEm:new Date()};
   else if(isPrio)lotes[lid].prioridade=true;
   if(lotes[lid].bags.find(b=>b.num===bn)){toast("⚠ Bag "+bn+" já registrada");return;}
